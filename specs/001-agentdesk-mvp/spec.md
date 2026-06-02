@@ -8,6 +8,15 @@
 
 **Input**: User description: "AgentDesk AI — plataforma SaaS multi-tenant donde una empresa gestiona tickets de soporte usando agentes IA con RAG, aprobaciones humanas, métricas, auditoría y webhooks."
 
+## Clarifications
+
+### Session 2026-06-02
+
+- Q: Default confidence threshold for waiting-for-approval vs escalated? → A: 0.7 (configurable)
+- Q: Default semantic-search similarity threshold (cosine 0..1)? → A: 0.5 (configurable)
+- Q: Webhook delivery retry policy? → A: 5 retries, exponential backoff with jitter
+- Q: JWT token model? → A: Short-lived access token (~30 min) + refresh token (~7 days)
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Operator triages a ticket with AI assistance and approves a grounded reply (Priority: P1)
@@ -164,7 +173,8 @@ portfolio, but it depends on the other stories generating data first.
 - **FR-001**: System MUST scope every ticket, document, knowledge-base entry, notification config, and
   audit record to a single organization, and MUST never expose one organization's data to another.
 - **FR-002**: System MUST authenticate users with a credential-based login that issues a
-  time-limited access token.
+  short-lived access token (default ~30 minutes) plus a longer-lived refresh token (default ~7 days),
+  with a token-refresh capability. Token lifetimes MUST be configurable.
 - **FR-003**: System MUST support three roles — administrator, operator, viewer — and MUST enforce
   per-action authorization (e.g., only operators/admins approve, reject, or edit drafts; only admins
   manage users, notification config, and view admin metrics; viewers are read-only).
@@ -177,7 +187,8 @@ portfolio, but it depends on the other stories generating data first.
 - **FR-006**: System MUST divide document content into retrievable passages and make them searchable
   by meaning, not just keywords.
 - **FR-007**: System MUST provide semantic search that returns only passages meeting or exceeding a
-  configurable similarity threshold, ranked by relevance, scoped to the caller's organization.
+  configurable similarity threshold (default cosine similarity 0.5), ranked by relevance, scoped to the
+  caller's organization.
 
 **Tickets**
 
@@ -193,8 +204,8 @@ portfolio, but it depends on the other stories generating data first.
 - **FR-011**: System MUST provide a workflow that, for a given ticket, classifies it (type and suggested
   priority), retrieves relevant knowledge-base context, drafts a suggested reply, evaluates how well the
   draft is grounded in the retrieved context, and decides an outcome.
-- **FR-012**: System MUST route the outcome by confidence: at or above a configurable threshold the
-  ticket goes to "waiting for approval"; below it, the ticket is "escalated".
+- **FR-012**: System MUST route the outcome by confidence: at or above a configurable threshold
+  (default 0.7) the ticket goes to "waiting for approval"; below it, the ticket is "escalated".
 - **FR-013**: System MUST run the AI workflow without blocking the requester (asynchronously) and MUST
   record, per run, its duration and an estimated processing cost.
 - **FR-014**: System MUST keep AI/embedding capability behind an interchangeable interface and MUST
@@ -225,7 +236,8 @@ portfolio, but it depends on the other stories generating data first.
 - **FR-021**: System MUST send a notification when a ticket transitions to "approved" or "escalated".
 - **FR-022**: System MUST sign each notification so recipients can verify authenticity and integrity.
 - **FR-023**: System MUST record each delivery attempt and MUST retry failed deliveries a bounded
-  number of times before marking the delivery failed.
+  number of times (default 5 attempts, exponential backoff with jitter) before marking the delivery
+  failed; the retry limit and backoff MUST be configurable.
 
 **Dashboard**
 
@@ -290,8 +302,8 @@ portfolio, but it depends on the other stories generating data first.
   complex PDFs) is out of scope for the MVP.
 - A single, deterministic offline AI/embedding capability is sufficient to demonstrate and test the
   full workflow; real providers are optional, opt-in, and never required to run or test the system.
-- Default similarity and confidence thresholds are configuration values with sensible defaults; exact
-  default numbers will be settled during clarification.
+- Default similarity (0.5) and confidence (0.7) thresholds are configuration values with sensible
+  defaults, settled during clarification and overridable via configuration.
 - Estimated processing cost is a computed approximation for observability, not a billing-grade figure.
 - The dashboard targets desktop browsers; mobile-optimized layouts are out of scope for the MVP.
 - A single shared knowledge base per organization is sufficient; per-team or per-product knowledge
