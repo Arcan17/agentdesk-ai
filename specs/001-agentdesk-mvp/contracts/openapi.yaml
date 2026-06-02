@@ -1,0 +1,253 @@
+openapi: 3.1.0
+info:
+  title: AgentDesk AI API
+  version: 1.0.0
+  description: >
+    Human-in-the-loop AI SupportOps Platform. All endpoints (except auth and health) require a
+    Bearer JWT access token and are scoped to the caller's organization.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Liveness/readiness probe
+      security: []
+      responses:
+        '200': { description: OK }
+
+  /auth/register:
+    post:
+      summary: Register a new organization with its first admin user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/TokenPair' } } } }
+        '409': { description: Organization or email already exists }
+
+  /auth/login:
+    post:
+      summary: Authenticate and receive access + refresh tokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TokenPair' } } } }
+        '401': { description: Invalid credentials (login_failed audited) }
+
+  /auth/refresh:
+    post:
+      summary: Exchange a refresh token for a new token pair
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [refresh_token], properties: { refresh_token: { type: string } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TokenPair' } } } }
+        '401': { description: Invalid/expired refresh token }
+
+  /users:
+    get:
+      summary: List users in the organization (admin)
+      responses: { '200': { description: OK } }
+    post:
+      summary: Create a user in the organization (admin)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UserCreate' } } }
+      responses: { '201': { description: Created }, '403': { description: Forbidden } }
+
+  /documents:
+    get:
+      summary: List knowledge-base documents (admin, operator, viewer)
+      responses: { '200': { description: OK } }
+    post:
+      summary: Add a document (manual content or upload) — admin/operator
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/DocumentCreate' } }
+      responses:
+        '201': { description: Created, ingested and embedded }
+        '422': { description: Empty content }
+
+  /documents/search:
+    post:
+      summary: Semantic search over the organization's knowledge base
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query: { type: string }
+                threshold: { type: number, default: 0.5 }
+                top_k: { type: integer, default: 5 }
+      responses:
+        '200':
+          description: Ranked passages at/above threshold
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/SearchHit' } } } }
+
+  /tickets:
+    get:
+      summary: List tickets (filter by status optional)
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+      responses: { '200': { description: OK } }
+    post:
+      summary: Create a ticket (admin/operator)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TicketCreate' } } }
+      responses: { '201': { description: Created (ticket_created audited) } }
+
+  /tickets/{id}:
+    get:
+      summary: Ticket detail (includes draft, final response, latest run)
+      parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+      responses: { '200': { description: OK }, '404': { description: Not found / other org } }
+
+  /tickets/{id}/events:
+    get:
+      summary: Ticket change history
+      parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+      responses: { '200': { description: OK } }
+
+  /tickets/{id}/run:
+    post:
+      summary: Trigger the AI workflow asynchronously (admin/operator)
+      parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+      responses:
+        '202': { description: Accepted; agent_run enqueued, returns run id }
+
+  /tickets/{id}/approve:
+    post:
+      summary: Approve the current draft (admin/operator)
+      parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+      responses:
+        '200': { description: Ticket approved (response_approved audited; webhook enqueued) }
+        '409': { description: Ticket not in waiting_approval }
+
+  /tickets/{id}/reject:
+    post:
+      summary: Reject the current draft (admin/operator)
+      parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { reason: { type: string } } } } }
+      responses: { '200': { description: Ticket rejected (response_rejected audited) }, '409': { description: Invalid state } }
+
+  /tickets/{id}/edit-draft:
+    patch:
+      summary: Edit the draft before approval (admin/operator)
+      parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [content], properties: { content: { type: string, minLength: 1 } } } } }
+      responses: { '200': { description: Draft updated (edit recorded) }, '422': { description: Empty content } }
+
+  /webhooks:
+    get:
+      summary: Get the organization's webhook configuration (admin)
+      responses: { '200': { description: OK } }
+    put:
+      summary: Create/update the organization's webhook configuration (admin)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/WebhookConfig' } } }
+      responses: { '200': { description: Saved } }
+
+  /webhooks/deliveries:
+    get:
+      summary: List recent webhook delivery attempts (admin)
+      responses: { '200': { description: OK } }
+
+  /admin/metrics:
+    get:
+      summary: Aggregate operational and AI metrics (admin)
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Metrics' } } }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [organization_name, email, password]
+      properties:
+        organization_name: { type: string }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+    TokenPair:
+      type: object
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        token_type: { type: string, enum: [bearer] }
+    UserCreate:
+      type: object
+      required: [email, password, role]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        role: { type: string, enum: [admin, operator, viewer] }
+    DocumentCreate:
+      type: object
+      required: [title, content]
+      properties:
+        title: { type: string }
+        content: { type: string, minLength: 1 }
+        source_type: { type: string, enum: [manual, upload], default: manual }
+    SearchHit:
+      type: object
+      properties:
+        chunk_id: { type: string, format: uuid }
+        document_id: { type: string, format: uuid }
+        content: { type: string }
+        score: { type: number }
+    TicketCreate:
+      type: object
+      required: [title, description]
+      properties:
+        title: { type: string }
+        description: { type: string }
+        priority: { type: string, enum: [low, medium, high, urgent], default: medium }
+    WebhookConfig:
+      type: object
+      required: [url, secret]
+      properties:
+        url: { type: string, format: uri }
+        secret: { type: string, minLength: 16 }
+        is_active: { type: boolean, default: true }
+    Metrics:
+      type: object
+      properties:
+        total_tickets: { type: integer }
+        tickets_by_status: { type: object, additionalProperties: { type: integer } }
+        avg_agent_latency_ms: { type: number }
+        avg_estimated_cost_usd: { type: number }
+        approval_rate: { type: number }
+        escalation_rate: { type: number }
+        retrieval_hit_rate: { type: number }
+        failed_jobs: { type: integer }
