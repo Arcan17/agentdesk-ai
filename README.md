@@ -10,7 +10,7 @@ external systems via signed webhooks.
 > retrieval, JWT + RBAC, Celery jobs, HMAC webhooks, structured audit logging, metrics, and a
 > deterministic test suite that runs with **zero paid API calls**.
 
-[![CI](https://github.com/OWNER/agentdesk-ai/actions/workflows/ci.yml/badge.svg)](./.github/workflows/ci.yml)
+[![CI](https://github.com/Arcan17/agentdesk-ai/actions/workflows/ci.yml/badge.svg)](./.github/workflows/ci.yml)
 
 ---
 
