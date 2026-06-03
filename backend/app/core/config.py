@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     confidence_threshold: float = 0.7
     similarity_threshold: float = 0.5
     retrieval_top_k: int = 5
+    # Run the agent workflow inline instead of dispatching to Celery (tests/local demos).
+    agent_run_eager: bool = False
 
     # --- Webhooks ---
     webhook_max_retries: int = 5
