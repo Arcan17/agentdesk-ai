@@ -10,23 +10,28 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "0003_tickets_audit"
 down_revision: str | None = "0002_org_user"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-ticket_status = sa.Enum(
+# create_type=False: types are created explicitly via .create() in upgrade(); this prevents
+# create_table from trying to emit CREATE TYPE again (which would duplicate them on PostgreSQL).
+ticket_status = postgresql.ENUM(
     "new", "triaged", "draft_ready", "waiting_approval",
     "approved", "rejected", "escalated", "closed",
-    name="ticket_status",
+    name="ticket_status", create_type=False,
 )
-ticket_priority = sa.Enum("low", "medium", "high", "urgent", name="ticket_priority")
-audit_event = sa.Enum(
+ticket_priority = postgresql.ENUM(
+    "low", "medium", "high", "urgent", name="ticket_priority", create_type=False
+)
+audit_event = postgresql.ENUM(
     "ticket_created", "agent_run_started", "retrieval_completed", "draft_generated",
     "response_approved", "response_rejected", "ticket_escalated", "webhook_sent",
     "login_success", "login_failed",
-    name="audit_event",
+    name="audit_event", create_type=False,
 )
 
 

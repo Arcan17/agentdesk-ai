@@ -10,14 +10,19 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "0005_agent_runs"
 down_revision: str | None = "0004_documents"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-run_status = sa.Enum("running", "completed", "failed", name="agent_run_status")
-run_outcome = sa.Enum("waiting_approval", "escalated", name="agent_run_outcome")
+run_status = postgresql.ENUM(
+    "running", "completed", "failed", name="agent_run_status", create_type=False
+)
+run_outcome = postgresql.ENUM(
+    "waiting_approval", "escalated", name="agent_run_outcome", create_type=False
+)
 json_type = sa.JSON().with_variant(sa.dialects.postgresql.JSONB(), "postgresql")
 
 

@@ -11,6 +11,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 from pgvector.sqlalchemy import Vector
+from sqlalchemy.dialects import postgresql
 
 from app.core.config import settings
 
@@ -19,7 +20,9 @@ down_revision: str | None = "0003_tickets_audit"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-document_source = sa.Enum("manual", "upload", name="document_source")
+document_source = postgresql.ENUM(
+    "manual", "upload", name="document_source", create_type=False
+)
 
 
 def upgrade() -> None:

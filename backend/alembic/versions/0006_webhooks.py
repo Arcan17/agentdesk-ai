@@ -10,13 +10,16 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "0006_webhooks"
 down_revision: str | None = "0005_agent_runs"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-delivery_status = sa.Enum("pending", "success", "failed", name="delivery_status")
+delivery_status = postgresql.ENUM(
+    "pending", "success", "failed", name="delivery_status", create_type=False
+)
 json_type = sa.JSON().with_variant(sa.dialects.postgresql.JSONB(), "postgresql")
 
 
