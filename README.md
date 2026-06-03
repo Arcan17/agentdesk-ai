@@ -123,8 +123,6 @@ workers/    Celery app + tasks (agent run, webhook delivery)
 
 ## Screenshots
 
-> _Placeholders — run the dashboard locally to capture._
-
 | Login | Tickets | Ticket detail (HITL) | Metrics |
 |---|---|---|---|
 | ![login](docs/screenshots/login.png) | ![tickets](docs/screenshots/tickets.png) | ![detail](docs/screenshots/detail.png) | ![metrics](docs/screenshots/metrics.png) |

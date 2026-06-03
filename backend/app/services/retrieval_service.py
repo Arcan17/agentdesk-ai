@@ -10,7 +10,7 @@ import math
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import Float, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -55,7 +55,9 @@ async def search(
 
     if _dialect_name(db) == "postgresql":
         # pgvector cosine distance operator; similarity = 1 - distance.
-        distance = DocumentChunk.embedding.op("<=>")(query_vec)
+        # return_type=Float so the distance column is parsed as a float, not re-parsed
+        # as a vector (the operator would otherwise inherit the embedding's Vector type).
+        distance = DocumentChunk.embedding.op("<=>", return_type=Float)(query_vec)
         stmt = (
             select(DocumentChunk, distance.label("distance"))
             .where(DocumentChunk.organization_id == organization_id)
@@ -65,10 +67,10 @@ async def search(
         rows = await db.execute(stmt)
         hits = [RetrievedChunk(chunk=c, score=1.0 - float(d)) for c, d in rows.all()]
     else:
-        stmt = select(DocumentChunk).where(
+        fallback_stmt = select(DocumentChunk).where(
             DocumentChunk.organization_id == organization_id
         )
-        chunks = list(await db.scalars(stmt))
+        chunks = list(await db.scalars(fallback_stmt))
         scored = [RetrievedChunk(chunk=c, score=_cosine(query_vec, c.embedding)) for c in chunks]
         scored.sort(key=lambda r: r.score, reverse=True)
         hits = scored[:top_k]
