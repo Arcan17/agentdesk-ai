@@ -1,5 +1,7 @@
 """Model package — import all models so SQLAlchemy metadata and Alembic see them."""
 from app.models.audit_log import AuditEvent, AuditLog
+from app.models.document import Document, DocumentSource
+from app.models.document_chunk import DocumentChunk
 from app.models.organization import Organization
 from app.models.ticket import Ticket, TicketPriority, TicketStatus
 from app.models.ticket_event import TicketEvent
@@ -15,4 +17,7 @@ __all__ = [
     "TicketEvent",
     "AuditLog",
     "AuditEvent",
+    "Document",
+    "DocumentSource",
+    "DocumentChunk",
 ]
