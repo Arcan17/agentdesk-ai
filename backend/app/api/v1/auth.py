@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
+from app.models.audit_log import AuditEvent
 from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenPair
-from app.services import auth_service
+from app.services import audit_service, auth_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -27,14 +28,28 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)) ->
 @router.post("/login", response_model=TokenPair)
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)) -> TokenPair:
     try:
-        tokens, _user = await auth_service.authenticate(
+        tokens, user = await auth_service.authenticate(
             db, email=body.email, password=body.password
         )
-        return tokens
     except auth_service.AuthError as exc:
+        await audit_service.record(
+            db,
+            event=AuditEvent.login_failed,
+            meta={"email": body.email},
+            commit=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         ) from exc
+
+    await audit_service.record(
+        db,
+        event=AuditEvent.login_success,
+        organization_id=user.organization_id,
+        actor_user_id=user.id,
+        commit=True,
+    )
+    return tokens
 
 
 @router.post("/refresh", response_model=TokenPair)
