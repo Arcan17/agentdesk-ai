@@ -7,6 +7,8 @@ from app.models.organization import Organization
 from app.models.ticket import Ticket, TicketPriority, TicketStatus
 from app.models.ticket_event import TicketEvent
 from app.models.user import Role, User
+from app.models.webhook import Webhook
+from app.models.webhook_delivery import DeliveryStatus, WebhookDelivery
 
 __all__ = [
     "Organization",
@@ -24,4 +26,7 @@ __all__ = [
     "AgentRun",
     "AgentRunStatus",
     "AgentRunOutcome",
+    "Webhook",
+    "WebhookDelivery",
+    "DeliveryStatus",
 ]

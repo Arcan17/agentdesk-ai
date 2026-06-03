@@ -12,6 +12,7 @@ os.environ.setdefault("LLM_PROVIDER", "mock")
 os.environ.setdefault("EMBEDDING_PROVIDER", "mock")
 os.environ.setdefault("JWT_SECRET", "test-secret-key-for-tests-only")
 os.environ.setdefault("AGENT_RUN_EAGER", "true")
+os.environ.setdefault("WEBHOOK_DISPATCH_ENABLED", "false")
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient

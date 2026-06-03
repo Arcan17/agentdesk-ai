@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     webhook_max_retries: int = 5
     webhook_backoff_base_seconds: float = 2.0
     webhook_timeout_seconds: float = 10.0
+    # Deliver webhooks inline instead of dispatching to Celery (local demos).
+    webhook_delivery_eager: bool = False
+    # When False, deliveries are still recorded but not dispatched (used in tests).
+    webhook_dispatch_enabled: bool = True
 
     # --- Security / HTTP ---
     cors_origins: str = "http://localhost:3000"

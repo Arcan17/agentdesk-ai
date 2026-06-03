@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.audit_log import AuditEvent
 from app.models.ticket import Ticket, TicketPriority, TicketStatus, can_transition
 from app.models.ticket_event import TicketEvent
-from app.services import audit_service
+from app.services import audit_service, webhook_service
 
 
 class NotFoundError(Exception):
@@ -18,6 +18,10 @@ class NotFoundError(Exception):
 
 class InvalidTransitionError(Exception):
     """Raised when a status change violates the ticket state machine."""
+
+
+class EmptyResponseError(Exception):
+    """Raised when approving/editing with empty content."""
 
 
 async def create_ticket(
@@ -130,4 +134,93 @@ async def transition(
     )
     if flush:
         await db.flush()
+    return ticket
+
+
+async def approve(
+    db: AsyncSession,
+    *,
+    ticket: Ticket,
+    actor_user_id: uuid.UUID,
+    edited_response: str | None = None,
+) -> Ticket:
+    """Approve the draft (optionally with an edit). Enqueues an approved webhook."""
+    final = (edited_response if edited_response is not None else ticket.draft_response) or ""
+    if not final.strip():
+        raise EmptyResponseError("A non-empty final response is required to approve")
+
+    ticket.final_response = final
+    await transition(
+        db,
+        ticket=ticket,
+        to_status=TicketStatus.approved,
+        actor_user_id=actor_user_id,
+        event_type="approved",
+        message="Response approved" + (" (edited)" if edited_response is not None else ""),
+    )
+    await audit_service.record(
+        db,
+        event=AuditEvent.response_approved,
+        organization_id=ticket.organization_id,
+        actor_user_id=actor_user_id,
+        target_type="ticket",
+        target_id=ticket.id,
+        meta={"edited": edited_response is not None},
+    )
+    await db.commit()
+    await db.refresh(ticket)
+    await webhook_service.enqueue_for_ticket(db, ticket=ticket, event="ticket.approved")
+    return ticket
+
+
+async def reject(
+    db: AsyncSession,
+    *,
+    ticket: Ticket,
+    actor_user_id: uuid.UUID,
+    reason: str | None = None,
+) -> Ticket:
+    await transition(
+        db,
+        ticket=ticket,
+        to_status=TicketStatus.rejected,
+        actor_user_id=actor_user_id,
+        event_type="rejected",
+        message=reason,
+    )
+    await audit_service.record(
+        db,
+        event=AuditEvent.response_rejected,
+        organization_id=ticket.organization_id,
+        actor_user_id=actor_user_id,
+        target_type="ticket",
+        target_id=ticket.id,
+        meta={"reason": reason},
+    )
+    await db.commit()
+    await db.refresh(ticket)
+    return ticket
+
+
+async def edit_draft(
+    db: AsyncSession,
+    *,
+    ticket: Ticket,
+    actor_user_id: uuid.UUID,
+    content: str,
+) -> Ticket:
+    if not content.strip():
+        raise EmptyResponseError("Draft content must not be empty")
+    ticket.draft_response = content
+    db.add(
+        TicketEvent(
+            ticket_id=ticket.id,
+            organization_id=ticket.organization_id,
+            event_type="edited",
+            actor_user_id=actor_user_id,
+            message="Draft edited",
+        )
+    )
+    await db.commit()
+    await db.refresh(ticket)
     return ticket

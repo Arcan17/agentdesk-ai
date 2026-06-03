@@ -18,7 +18,7 @@ from app.agent.state import AgentState
 from app.models.agent_run import AgentRun, AgentRunOutcome, AgentRunStatus
 from app.models.audit_log import AuditEvent
 from app.models.ticket import Ticket, TicketPriority, TicketStatus
-from app.services import audit_service, ticket_service
+from app.services import audit_service, ticket_service, webhook_service
 
 
 async def start_run(
@@ -135,6 +135,11 @@ async def execute_run(db: AsyncSession, *, run_id: uuid.UUID) -> AgentRun:
         run.finished_at = datetime.now(UTC)
         await db.commit()
         await db.refresh(run)
+        if run.outcome == AgentRunOutcome.escalated:
+            await db.refresh(ticket)
+            await webhook_service.enqueue_for_ticket(
+                db, ticket=ticket, event="ticket.escalated"
+            )
         return run
     except Exception as exc:  # noqa: BLE001 - record failure, re-raise for caller/worker
         await db.rollback()
